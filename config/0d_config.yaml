@@ -1,0 +1,7 @@
+config_type: "0D"
+mechanism: "gri30.yaml"
+config_type: "constant_volume"
+phi_range: [0.8, 1.2]
+pressure_range: [1e5, 5e5]  # Pa
+temperature_range: [1000, 1500]  # K
+num_samples: 1000

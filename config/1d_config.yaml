@@ -1,0 +1,11 @@
+{
+    "fuel": "H2",
+    "mechanism": "Burke2012_s9r23.yaml",
+    "gas_state": {
+        "initial_temperature": 300,
+        "initial_pressure": 101325,
+        "fuel_composition": "H2:1",
+        "oxidizer_composition": "O2:0.21,N2:0.79",
+        "equivalence_ratio": 1.0
+    }
+}
