@@ -6,16 +6,16 @@ from pathlib import Path
 from cantera import Solution
 
 import sys
-# 添加 ODEBench 根目录到 sys.path
+# 添加 FlameBench 根目录到 sys.path
 sys.path.append(str(Path(__file__).resolve().parents[1]))
 from utils.utils import get_path_from_root, is_numeric_string
-import data_sampler.oneDflame_setup as odf
+import flamebench.data_sampler.oneDflame_setup as odf
 
 class OneDSampler:
     def __init__(self, config_path=None, verbose=True):
         self.verbose = verbose
         self.project_root = get_path_from_root()
-        self.working_dir = get_path_from_root("odebench", "data_sampler", "oneDFlame")
+        self.working_dir = get_path_from_root("oneDFlame")
         self.config_path = config_path or get_path_from_root("config", "1d_config.yaml")
         self.data = None
         self._load_config()
@@ -32,7 +32,10 @@ class OneDSampler:
             self.config = yaml.safe_load(f)
 
         self.fuel = self.config.get("fuel", "unknown")
-        self.mechanism_path = get_path_from_root("mechanisms", self.config["mechanism"])
+        
+        mechanism_filename = self.config.get("mechanism")
+        self.mechanism_path = get_path_from_root("mechanisms", mechanism_filename)
+        
         self.gas_state = self.config.get("gas_state", {})
 
         self._log(f"Loaded config for fuel: {self.fuel}")
@@ -44,21 +47,56 @@ class OneDSampler:
         self._log("Sampling completed.")
 
     def _run_case_setup(self):
-        os.chdir(self.working_dir)
+        # Store original working directory
+        # original_cwd = Path.cwd()
+        
+        # Change to working directory for OpenFOAM operations
+        os.chdir(self.project_root)
 
         self._log("Calculating steady flame properties with Cantera...")
+        
+        # Convert absolute path to relative path for Cantera compatibility
+        # Since we changed working directory, we need to handle path conversion carefully
+        mechanism_path_for_cantera = self.mechanism_path
+        if Path(self.mechanism_path).is_absolute():
+            # Try to convert to relative path from the original directory
+            try:
+                # First, go back to original directory to test relative path
+                relative_path = Path(self.mechanism_path).relative_to(Path.cwd())
+                mechanism_path_for_cantera = str(relative_path).replace('\\', '/')
+                self._log(f"Converted to relative path for Cantera: {mechanism_path_for_cantera}")
+            except ValueError:
+                # If not relative, use mechanisms/ prefix and copy file if needed
+                filename = Path(self.mechanism_path).name
+                mechanism_path_for_cantera = f"mechanisms/{filename}"
+                self._log(f"Using mechanisms/ prefix for Cantera: {mechanism_path_for_cantera}")
+                
+                # Copy mechanism file to local mechanisms directory if it doesn't exist
+                mechanisms_dir = Path("mechanisms")
+                mechanisms_dir.mkdir(exist_ok=True)
+                target_file = mechanisms_dir / filename
+                if not target_file.exists():
+                    import shutil
+                    shutil.copy2(self.mechanism_path, target_file)
+                    self._log(f"Copied mechanism file to: {target_file}")
+            
+            # Change back to working directory
+        self.mechanism_path_for_cantera = mechanism_path_for_cantera
+
         flame_speed, flame_thickness, _ = odf.calculate_laminar_flame_properties(
-            self.mechanism_path, self.gas_state
+            self.mechanism_path_for_cantera, self.gas_state
         )
 
         case_params = odf.update_case_parameters(
-            self.mechanism_path, self.gas_state, flame_speed, flame_thickness
+            self.mechanism_path_for_cantera, self.gas_state, flame_speed, flame_thickness
         )
 
         odf.update_one_d_sample_config(case_params, self.gas_state)
         odf.create_0_species_files(case_params)
         odf.update_set_fields_dict(case_params)
-        odf.update_cantera_mechanism(self.mechanism_path)
+        odf.update_cantera_mechanism(self.mechanism_path_for_cantera)
+
+        os.chdir(self.working_dir)
 
         self._log("⚙️ Running Allrun script...")
         subprocess.run(["chmod", "+x", "Allrun"], check=True)
@@ -74,7 +112,7 @@ class OneDSampler:
 
 
         self._log("Running reconstructPar...")
-        temp_gas = Solution(self.mechanism_path)
+        temp_gas = Solution(self.mechanism_path_for_cantera)
         fields_list = ['T', 'p'] + temp_gas.species_names
         fields_str = "(" + " ".join(fields_list) + ")"
         #subprocess.run(["reconstructPar", "-fields", fields_str], check=True)
@@ -88,7 +126,7 @@ class OneDSampler:
     def _collect_data(self):
         self._log("Collecting flame data from time directories...")
 
-        sample_dims = ['T', 'p'] + Solution(self.mechanism_path).species_names
+        sample_dims = ['T', 'p'] + Solution(self.mechanism_path_for_cantera).species_names
         time_dirs = sorted([
             d for d in Path('.').iterdir()
             if d.is_dir() and is_numeric_string(d.name)
@@ -154,3 +192,7 @@ class OneDSampler:
         self._log("Cleaning up with Allclean...")
         subprocess.run(["./Allclean"], check=True)
         self._log("Allclean completed.")
+
+if __name__ == "__main__":
+    sampler = OneDSampler()
+    sampler.sample()

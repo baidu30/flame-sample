@@ -1,0 +1,55 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| =========                 |                                                 |
+| \\      /  F ield         | OpenFOAM: The Open Source CFD Toolbox           |
+|  \\    /   O peration     | Version:  v2012                                 |
+|   \\  /    A nd           | Website:  www.openfoam.com                      |
+|    \\/     M anipulation  |                                                 |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    location    "system";
+    object      setFieldsDict;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+// Set values on a selected portion of the domain
+defaultFieldValues
+(
+    volScalarFieldValue T 300
+    volScalarFieldValue p 101325
+    volScalarFieldValue YH 0.000000e+00
+    volScalarFieldValue YH2 2.851163e-02
+    volScalarFieldValue YO 0.000000e+00
+    volScalarFieldValue YOH 0.000000e+00
+    volScalarFieldValue YH2O 0.000000e+00
+    volScalarFieldValue YO2 2.262686e-01
+    volScalarFieldValue YHO2 0.000000e+00
+    volScalarFieldValue YH2O2 0.000000e+00
+    volScalarFieldValue YN2 7.452198e-01
+);
+
+regions
+(
+    boxToCell
+    {{
+        box (0 0 0) ({half_domain_length:.6e} 0.1 0.1);
+        fieldValues
+        (
+            volScalarFieldValue T {initial_temperature + 1000}  // Higher temperature in reaction zone
+        );
+    }}
+
+    boxToCell
+    {{
+        box ({half_domain_length:.6e} 0 0) ({domain_length:.6e} 0.1 0.1);
+        fieldValues
+        (
+            volScalarFieldValue T {initial_temperature}  // Unburned gas temperature
+        );
+    }}
+);
+
+// ************************************************************************* //

@@ -29,7 +29,7 @@ def get_path_from_root(*parts):
     else:
         current_path = Path.cwd().resolve()
 
-    # 假设你的根目录就是 ODEBench (包含 config、mechanisms 等文件夹)
+    # 假设你的根目录就是 FlameBench (包含 config、mechanisms 等文件夹)
     # 向上找一个包含 config 和 mechanisms 的目录
     for parent in [current_path] + list(current_path.parents):
         if (parent / "config").exists() and (parent / "mechanisms").exists():
